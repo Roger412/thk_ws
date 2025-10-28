@@ -488,10 +488,11 @@ void rpmPublisherCallback(rcl_timer_t * timer, int64_t last_call_time)
 
     encoder_msg.data.capacity = 4;
     encoder_msg.data.size = 4;
-    encoder_msg.data.data[0] = motor1_encoder.read();
-    encoder_msg.data.data[1] = motor2_encoder.read();
-    encoder_msg.data.data[2] = motor3_encoder.read();
-    encoder_msg.data.data[3] = motor4_encoder.read();
+    // Placed in order from written notes in base
+    encoder_msg.data.data[3] = motor1_encoder.read(); // motor 1
+    encoder_msg.data.data[2] = motor2_encoder.read(); // motor 2
+    encoder_msg.data.data[1] = motor3_encoder.read(); // motor 3
+    encoder_msg.data.data[0] = motor4_encoder.read(); // motor 4
 
     RCSOFTCHECK(rcl_publish(&pwm_soll_publisher, &pwm_soll_msg, NULL));
     RCSOFTCHECK(rcl_publish(&pwm_ist_publisher, &pwm_ist_msg, NULL));
