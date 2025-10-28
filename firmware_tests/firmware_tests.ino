@@ -209,12 +209,28 @@ void twistCallback(const void * msgin)
 
 bool createEntities()
 {
-    allocator = rcl_get_default_allocator();
+//    allocator = rcl_get_default_allocator();
     //create init_options
-    RCCHECK(rclc_support_init(&support, 0, NULL, &allocator));
+//    RCCHECK(rclc_support_init(&support, 0, NULL, &allocator));
     // create node
-    RCCHECK(rclc_node_init_default(&node, "linorobot_base_node", "", &support));
+//    RCCHECK(rclc_node_init_default(&node, "linorobot_base_node", "", &support));
     // create odometry publisher
+
+ allocator = rcl_get_default_allocator();
+
+// create init_options
+auto init_options = rcl_get_zero_initialized_init_options();
+RCCHECK(rcl_init_options_init(&init_options, allocator)); // <--- This was missing on ur side
+
+// Set ROS domain id
+const int domain_id = 20;
+RCCHECK(rcl_init_options_set_domain_id(&init_options, domain_id));
+
+// Setup support structure.
+RCCHECK(rclc_support_init_with_options(&support, 0, NULL, &init_options, &allocator));
+
+    RCCHECK(rclc_node_init_default(&node, "linorobot_base_node", "", &support));
+
     RCCHECK(rclc_publisher_init_default( 
         &odom_publisher, 
         &node,
@@ -287,7 +303,7 @@ bool createEntities()
         &encoder_publisher,
         &node,
         ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32MultiArray),
-        "enc_cnts"
+        "enc_delta"
     ));
     encoder_msg.data.data = (int32_t*)malloc(sizeof(int32_t) * 4);
 
@@ -381,14 +397,14 @@ void moveBase()
         motor2_controller.spin(motor2.stellgroesse);
         motor3_controller.spin(motor3.stellgroesse);
         motor4_controller.spin(motor4.stellgroesse); 
-        // motor1.setpoint = 62.5;
-        // motor2.setpoint = 62.5;
-        // motor3.setpoint = 62.5;
-        // motor4.setpoint = 62.5;
-        // motor1_controller.spin(1024);
-        // motor2_controller.spin(1024);
-        // motor3_controller.spin(1024);
-        // motor4_controller.spin(1024);
+        //motor1.setpoint = 62.5;
+        //motor2.setpoint = 62.5;
+        //motor3.setpoint = 62.5;
+        //motor4.setpoint = 62.5;
+        //motor1_controller.spin(0); //motor 3
+        //motor2_controller.spin(0); //motor 1
+        //motor3_controller.spin(1024); //motor 4
+        //motor4_controller.spin(0); //motor 2
     }
 
     Kinematics::velocities current_vel = kinematics.getVelocities(
@@ -470,7 +486,6 @@ void rpmPublisherCallback(rcl_timer_t * timer, int64_t last_call_time)
     pwm_ist_msg.data.data[2] = motor3.rpm;
     pwm_ist_msg.data.data[3] = motor4.rpm;
 
-
     encoder_msg.data.capacity = 4;
     encoder_msg.data.size = 4;
     encoder_msg.data.data[0] = motor1_encoder.read();
@@ -481,8 +496,6 @@ void rpmPublisherCallback(rcl_timer_t * timer, int64_t last_call_time)
     RCSOFTCHECK(rcl_publish(&pwm_soll_publisher, &pwm_soll_msg, NULL));
     RCSOFTCHECK(rcl_publish(&pwm_ist_publisher, &pwm_ist_msg, NULL));
     RCSOFTCHECK(rcl_publish(&encoder_publisher, &encoder_msg, NULL));
-
-    
 }
 
 void publishData()
