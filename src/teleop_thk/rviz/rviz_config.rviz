@@ -1,0 +1,13 @@
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/Odometry
+      Name: Odometry
+      Topic: /odom/unfiltered
+      Enabled: true
+      Color: 255; 25; 0
+      Covariance:
+        Orientation: false
+        Position: false
+  Fixed Frame: map
+  Enabled: true
