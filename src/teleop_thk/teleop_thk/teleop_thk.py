@@ -70,7 +70,7 @@ speedBindings = {
     'c': (1, .9),
 }
 
-def getKey(settings, timeout=0.1):
+def getKey(settings, timeout=None): # Set timeout to # seconds to make it non-blocking
     tty.setraw(sys.stdin.fileno())
     rlist, _, _ = select.select([sys.stdin], [], [], timeout)
     key = sys.stdin.read(1) if rlist else ''

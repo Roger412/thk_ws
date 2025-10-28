@@ -313,6 +313,7 @@ bool destroyEntities()
     rclc_support_fini(&support);
     rcl_publisher_fini(&pwm_soll_publisher, &node);
     rcl_publisher_fini(&pwm_ist_publisher, &node);
+    rcl_publisher_fini(&encoder_publisher, &node);
 
     digitalWrite(LED_PIN, HIGH);
     
