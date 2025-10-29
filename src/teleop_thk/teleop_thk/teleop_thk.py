@@ -267,7 +267,7 @@ def main():
 
                                    
 			elif control_mode == 'auto':
-				# ───── Autonomous pose control ─────
+				# ───── Autonomous pose control (PI control) ─────
 				x_target = node.get_parameter('x_pos').value
 				y_target = node.get_parameter('y_pos').value
 				heading_target = node.get_parameter('heading').value
@@ -276,9 +276,11 @@ def main():
 				y_curr = node.odom_data["y"]
 				heading_curr = node.odom_data["heading"]
 
-				# P control gains
-				k_lin = 0.1
-				k_ang = 0.1
+				# Control gains
+				k_lin_p = 0.1
+				k_lin_i = 0.02     # integral gain (tune carefully)
+				k_ang_p = 0.1
+				k_ang_i = 0.02
 
 				# position error
 				dx = x_target - x_curr
@@ -289,33 +291,54 @@ def main():
 				angle_error = heading_target - heading_curr
 				angle_error = math.atan2(math.sin(angle_error), math.cos(angle_error))
 
-				# thresholds to decide when to switch from translation to rotation
+				# time step (for integral accumulation)
+				now = time()
+				if not hasattr(node, "last_time"):
+					node.last_time = now
+					node.integral_dist = 0.0
+					node.integral_angle = 0.0
+				dt = now - node.last_time
+				node.last_time = now
+
+				# accumulate integral terms (with basic anti-windup)
+				node.integral_dist += dist * dt
+				node.integral_angle += angle_error * dt
+				node.integral_dist = max(min(node.integral_dist, 1.0), -1.0)     # clamp
+				node.integral_angle = max(min(node.integral_angle, 1.0), -1.0)
+
+				# thresholds
 				pos_tolerance = 0.2     # [m]
 				heading_tolerance = 0.2 # [rad]
 
 				if dist > pos_tolerance:
 					# Phase 1: move to (x, y)
-					twist.linear.x = k_lin * dx
-					twist.linear.y = k_lin * dy
+					lin_cmd = k_lin_p * dist + k_lin_i * node.integral_dist
+					twist.linear.x = lin_cmd * (dx / (dist + 1e-6))   # normalize direction
+					twist.linear.y = lin_cmd * (dy / (dist + 1e-6))
 					twist.angular.z = 0.0
 					state = "MOVING_TO_POSITION"
+
 				elif abs(angle_error) > heading_tolerance:
 					# Phase 2: rotate in place
-					twist.linear.x = 0.0
-					twist.linear.y = 0.0
-					twist.angular.z = k_ang * angle_error
+					ang_cmd = k_ang_p * angle_error + k_ang_i * node.integral_angle
+					twist.linear.x = twist.linear.y = 0.0
+					twist.angular.z = ang_cmd
 					state = "CORRECTING_HEADING"
+
 				else:
-					# Done: stop
+					# Done: stop + reset integrators
 					twist.linear.x = twist.linear.y = twist.angular.z = 0.0
+					node.integral_dist = 0.0
+					node.integral_angle = 0.0
 					state = "GOAL_REACHED"
 
-				# 🟢 Print detailed diagnostics
+				# 🟢 Diagnostics
 				print(
 					f"[AUTO] {state}\n"
 					f"  Target: ({x_target:.2f}, {y_target:.2f}, {heading_target:.2f} rad)\n"
 					f"  Current: ({x_curr:.2f}, {y_curr:.2f}, {heading_curr:.2f} rad)\n"
 					f"  Errors: dx={dx:.3f}, dy={dy:.3f}, dist={dist:.3f}, angle_err={angle_error:.3f} rad\n"
+					f"  Integrals: dist_i={node.integral_dist:.3f}, ang_i={node.integral_angle:.3f}\n"
 					f"  Cmd_vel: lin=({twist.linear.x:.3f}, {twist.linear.y:.3f}), ang_z={twist.angular.z:.3f}\n"
 				)
 
