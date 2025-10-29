@@ -102,9 +102,8 @@ class TeleopTwistKeyboardNode(Node):
 		super().__init__('teleop_twist_keyboard')
 
 		# ───── Parameters ─────
-		read_only = ParameterDescriptor(read_only=True)
-		self.declare_parameter('stamped', False, read_only)
-		self.declare_parameter('frame_id', '', read_only)
+		self.declare_parameter('stamped', False)
+		self.declare_parameter('frame_id', '')
 
 		desc_speed = ParameterDescriptor(description="Linear speed scaling factor")
 		desc_turn  = ParameterDescriptor(description="Angular speed scaling factor")
@@ -278,28 +277,27 @@ def main():
 				heading_curr = node.odom_data["heading"]
 
 				# P control gains
-				k_lin = 0.5
-				k_ang = 0.8
+				k_lin = 0.1
+				k_ang = 0.1
 
 				# position error
 				dx = x_target - x_curr
 				dy = y_target - y_curr
 				dist = math.sqrt(dx**2 + dy**2)
 
-				# heading error
+				# heading error (normalized to [-pi, pi])
 				angle_error = heading_target - heading_curr
-				# normalize to [-pi, pi]
 				angle_error = math.atan2(math.sin(angle_error), math.cos(angle_error))
 
 				# thresholds to decide when to switch from translation to rotation
-				pos_tolerance = 0.05     # [m]
-				heading_tolerance = 0.02 # [rad]
+				pos_tolerance = 0.2     # [m]
+				heading_tolerance = 0.2 # [rad]
 
 				if dist > pos_tolerance:
 					# Phase 1: move to (x, y)
 					twist.linear.x = k_lin * dx
 					twist.linear.y = k_lin * dy
-					twist.angular.z = 0.0  # no rotation yet
+					twist.angular.z = 0.0
 					state = "MOVING_TO_POSITION"
 				elif abs(angle_error) > heading_tolerance:
 					# Phase 2: rotate in place
@@ -312,8 +310,15 @@ def main():
 					twist.linear.x = twist.linear.y = twist.angular.z = 0.0
 					state = "GOAL_REACHED"
 
-				print(f"[AUTO] {state}: target=({x_target:.2f},{y_target:.2f},{heading_target:.2f}) "
-					f"→ cmd_vel=({twist.linear.x:.2f},{twist.linear.y:.2f},{twist.angular.z:.2f})")
+				# 🟢 Print detailed diagnostics
+				print(
+					f"[AUTO] {state}\n"
+					f"  Target: ({x_target:.2f}, {y_target:.2f}, {heading_target:.2f} rad)\n"
+					f"  Current: ({x_curr:.2f}, {y_curr:.2f}, {heading_curr:.2f} rad)\n"
+					f"  Errors: dx={dx:.3f}, dy={dy:.3f}, dist={dist:.3f}, angle_err={angle_error:.3f} rad\n"
+					f"  Cmd_vel: lin=({twist.linear.x:.3f}, {twist.linear.y:.3f}), ang_z={twist.angular.z:.3f}\n"
+				)
+
 					
 			node.pub.publish(twist_msg)
 			
